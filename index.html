@@ -48,7 +48,7 @@ const $=i=>document.getElementById(i);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let T='',D=null;const S={ap:[],ef:[],eq:[],fo:[]};
 try{T=sessionStorage.getItem('t')||''}catch(e){}
-function say(t,ok){const m=$('msg');m.textContent=t;m.style.background=ok?'#2e7d32':'#c62828';m.style.display='block';clearTimeout(say.t);say.t=setTimeout(()=>m.style.display='none',6000)}
+function say(t,ok,ms){const m=$('msg');m.textContent=t;m.style.background=ok?'#2e7d32':'#c62828';m.style.display='block';clearTimeout(say.t);say.t=setTimeout(()=>m.style.display='none',ms||6000)}
 async function call(a,b){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action:a,token:T},b||{}))});
   const j=await r.json();if(!j.ok)throw new Error(j.error||'Erro');return j}
 const O=(a,v)=>'<option value=""></option>'+a.map(x=>{const k=Array.isArray(x)?x[0]:x,l=Array.isArray(x)?x[1]:x;return `<option value="${esc(k)}"${String(k)===String(v)?' selected':''}>${esc(l)}</option>`}).join('');
@@ -98,7 +98,7 @@ $('obra').onchange=rAp;
 const comp=f=>new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement('canvas');
   c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.72))};im.onerror=no;im.src=URL.createObjectURL(f)});
 $('bf').onclick=()=>$('fi').click();
-$('fi').onchange=async e=>{for(const f of e.target.files){if(S.fo.length>=10){say('Máximo de 10 fotos',false);break}S.fo.push({b64:await comp(f),leg:'',extra:false})}e.target.value='';rFo()};
+$('fi').onchange=async e=>{const fs=[...e.target.files];let bad=0;for(const f of fs){if(S.fo.length>=10){say('Máximo de 10 fotos',false);break}try{S.fo.push({b64:await comp(f),leg:'',extra:false})}catch(x){bad++}}e.target.value='';rFo();if(bad)say(bad+' foto(s) não puderam ser lidas (formato não suportado). Tente outra ou tire pela câmera.',false,12000)};
 
 async function start(){D=await call('bootstrap');$('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent=D.user.nome||D.user.usuario;
   $('obra').innerHTML=O(D.obras.map(o=>o.OBRA),D.obras.length===1?D.obras[0].OBRA:'');
@@ -107,8 +107,12 @@ async function start(){D=await call('bootstrap');$('login').classList.add('hide'
 $('bl').onclick=async()=>{try{T='';const j=await call('login',{usuario:$('lu').value,senha:$('lp').value});T=j.token;try{sessionStorage.setItem('t',T)}catch(e){}await start()}catch(e){say(e.message,false)}};
 $('out').onclick=()=>{try{sessionStorage.removeItem('t')}catch(e){}location.reload()};
 
+let cd=0;function cool(b){cd=60;b.textContent='Aguarde 60s para reenviar';const t=setInterval(()=>{cd--;if(cd<=0){clearInterval(t);b.disabled=false;b.textContent='Enviar novamente (substitui o RDO do dia)'}else b.textContent=`Aguarde ${cd}s para reenviar`},1000)}
 $('env').onclick=async()=>{const b=$('env');try{
   if(!$('obra').value||!$('dt').value)throw new Error('Informe a obra e a data');
+  if(!S.ap.length)throw new Error('Inclua ao menos um apontamento');
+  const bad=S.ap.findIndex(a=>!a.COD||!a['HR INICIAL']||!a['HR FINAL']);if(bad>=0)throw new Error(`Apontamento #${bad+1}: informe código, início e fim`);
+  if(!confirm(`Enviar o RDO de ${$('obra').value} do dia ${$('dt').value.split('-').reverse().join('/')} com ${S.ap.length} apontamentos e ${S.fo.length} fotos?`))return;
   b.disabled=true;say('Enviando RDO...',true);
   const aps=S.ap.map(a=>{const o=Object.assign({},a),q=S.eq[a._eq];delete o._eq;
     if(q){o['ORIGEM EQUIP.']=q['ORIGEM (PRÓPRIO/LOCADO)'];if(q['ORIGEM (PRÓPRIO/LOCADO)']==='LOCADO')o['EQUIPAMENTO LOCADO (DESCRIÇÃO)']=q['EQUIPAMENTO (CADASTRO OU DIGITADO)'];else o['EQUIPAMENTO (PLACA/ID)']=q['PLACA / ID']}
@@ -117,9 +121,14 @@ $('env').onclick=async()=>{const b=$('env');try{
     descricao:$('ds').value,notas:$('nt').value,obsEmpresa:$('oe').value,obsContratante:$('oc').value,fiscal:$('fs').value,
     apontamentos:aps,efetivo:S.ef.filter(r=>r['FUNÇÃO']&&r.QUANTIDADE),equipamentos:S.eq.filter(r=>r['PLACA / ID']||r['EQUIPAMENTO (CADASTRO OU DIGITADO)'])};
   const j=await call('saveRdo',{rdo});
-  for(let i=0;i<S.fo.length;i++){say(`Enviando foto ${i+1} de ${S.fo.length}...`,true);const p=S.fo[i];
-    await call('uploadFoto',{foto:{idRdo:j.idRdo,numero:j.numero,obra:rdo.obra,data:rdo.data,n:i+1,legenda:p.leg,extra:p.extra,mime:'image/jpeg',b64:p.b64.split(',')[1]}})}
-  say(`RDO nº ${j.numero} enviado com sucesso`,true)}catch(e){say(e.message,false)}b.disabled=false};
+  const fail=[];let err='';
+  for(let i=0;i<S.fo.length;i++){say(`Enviando foto ${i+1} de ${S.fo.length}...`,true);const p=S.fo[i];let ok=false;
+    for(let k=0;k<2&&!ok;k++){try{await call('uploadFoto',{foto:{idRdo:j.idRdo,numero:j.numero,obra:rdo.obra,data:rdo.data,n:i+1,legenda:p.leg,extra:p.extra,mime:'image/jpeg',b64:p.b64.split(',')[1]}});ok=true}catch(x){err=x.message}}
+    if(!ok)fail.push(i+1)}
+  let pdfErr='';if(!fail.length){say('Gerando PDF do RDO...',true);try{await call('gerarPdf',{idRdo:j.idRdo})}catch(x){pdfErr=x.message}}
+  if(fail.length)say(`RDO nº ${j.numero} salvo, mas as fotos ${fail.join(', ')} não foram enviadas (${err}). Toque em Enviar de novo.`,false,20000);
+  else if(pdfErr)say(`RDO nº ${j.numero} salvo, mas o PDF falhou (${pdfErr}). Toque em Enviar de novo.`,false,20000);
+  else{say(`RDO nº ${j.numero} enviado e PDF gerado (${S.fo.length} fotos)`,true,10000);cool(b)}}catch(e){say(e.message,false)}if(!cd)b.disabled=false};
 
 if(T)start().catch(()=>{T=''});
 </script></body></html>
