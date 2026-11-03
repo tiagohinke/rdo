@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RDO – Viasan</title>
+<style>
+:root{--c:#34457a}*{box-sizing:border-box}
+body{margin:0;font:15px Arial,sans-serif;background:#f3f4f8;color:#222}
+header{background:#fff;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--c);position:sticky;top:0;z-index:5}
+header img{height:36px}main{max-width:720px;margin:auto;padding:10px 10px 90px}
+.card{background:#fff;border-radius:10px;padding:12px;margin:10px 0;box-shadow:0 1px 3px #0002}
+h2{margin:0 0 8px;font-size:16px;color:var(--c)}label{display:block;font-size:12px;color:#555;margin:6px 0 2px}
+input,select,textarea{width:100%;padding:9px;border:1px solid #bbb;border-radius:6px;font:inherit;background:#fff}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}
+button{background:var(--c);color:#fff;border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:bold;margin-top:6px}
+button.s{background:#e8eaf3;color:var(--c)}button.x{background:#fbe9e9;color:#b00;padding:6px 10px}
+button:disabled{opacity:.5}.item{border:1px solid #dde;border-radius:8px;padding:8px;margin:8px 0;background:#fafbff}
+.ph{display:flex;gap:8px;align-items:center;margin:6px 0}.ph img{width:64px;height:64px;object-fit:cover;border-radius:6px}
+.ph label{margin:0;white-space:nowrap}.ph input[type=checkbox]{width:auto}
+#msg{position:fixed;bottom:0;left:0;right:0;padding:12px;text-align:center;color:#fff;display:none;z-index:9}.hide{display:none}
+</style></head><body>
+<header><img src="logo.png" alt="Viasan"><span><span id="who"></span> <button class="s" id="out" style="margin:0 0 0 6px;padding:6px 10px">Sair</button></span></header>
+<main>
+<div id="login" class="card"><h2>Entrar</h2>
+<label>Usuário</label><input id="lu" autocapitalize="none" autocomplete="username">
+<label>Senha</label><input id="lp" type="password" autocomplete="current-password">
+<button id="bl">Entrar</button></div>
+<div id="app" class="hide">
+<div class="card"><h2>Dados do dia</h2><div class="g">
+<div><label>Obra</label><select id="obra"></select></div><div><label>Data</label><input id="dt" type="date"></div>
+<div><label>Clima manhã</label><select id="cm"></select></div><div><label>Clima tarde</label><select id="ct"></select></div>
+<div><label>Clima noite</label><select id="cn"></select></div><div><label>Condição do terreno</label><select id="tr"></select></div></div></div>
+<div class="card"><h2>Efetivo</h2><div id="ef"></div><button class="s" data-add="ef">+ Função</button></div>
+<div class="card"><h2>Equipamentos do dia</h2><div id="eq"></div><button class="s" data-add="eq">+ Equipamento</button></div>
+<div class="card"><h2>Apontamentos</h2><div id="ap"></div><button class="s" data-add="ap">+ Apontamento</button></div>
+<div class="card"><h2>Descrição e observações</h2>
+<label>Descrição do que foi feito</label><textarea id="ds" rows="4"></textarea>
+<label>Notas / sugestões</label><textarea id="nt" rows="2"></textarea>
+<label>Observações da empresa</label><textarea id="oe" rows="2"></textarea>
+<label>Observações do contratante</label><textarea id="oc" rows="2"></textarea>
+<label>Fiscal (nome)</label><input id="fs"></div>
+<div class="card"><h2>Fotos (até 10)</h2><div id="ph"></div>
+<input id="fi" type="file" accept="image/*" multiple class="hide"><button class="s" id="bf">+ Adicionar fotos</button></div>
+<button id="env" style="width:100%;padding:14px">Enviar RDO</button>
+</div></main><div id="msg"></div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbyH86_b7Wo8O6ivImyNkrHleQcevH7dXWQquXULnluhMg0vU5PEOM9uOECX6qIQv_6o/exec';
+const $=i=>document.getElementById(i);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let T='',D=null;const S={ap:[],ef:[],eq:[],fo:[]};
+try{T=sessionStorage.getItem('t')||''}catch(e){}
+function say(t,ok){const m=$('msg');m.textContent=t;m.style.background=ok?'#2e7d32':'#c62828';m.style.display='block';clearTimeout(say.t);say.t=setTimeout(()=>m.style.display='none',6000)}
+async function call(a,b){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action:a,token:T},b||{}))});
+  const j=await r.json();if(!j.ok)throw new Error(j.error||'Erro');return j}
+const O=(a,v)=>'<option value=""></option>'+a.map(x=>{const k=Array.isArray(x)?x[0]:x,l=Array.isArray(x)?x[1]:x;return `<option value="${esc(k)}"${String(k)===String(v)?' selected':''}>${esc(l)}</option>`}).join('');
+const F=(l,i,f,lab,type,list)=>`<div><label>${lab}</label>`+(list?`<select data-l="${l}" data-i="${i}" data-f="${esc(f)}">${O(list,S[l][i][f])}</select>`:
+  `<input type="${type||'text'}" data-l="${l}" data-i="${i}" data-f="${esc(f)}" value="${esc(S[l][i][f])}"${type==='number'?' inputmode="decimal" step="any"':''}>`)+'</div>';
+const DEL=(l,i)=>`<button class="x" data-del="${l}" data-i="${i}">Remover</button>`;
+const pf=()=>{const o=D.obras.find(o=>o.OBRA===$('obra').value);return o?String(o.PERFIL).toUpperCase():'TERRAPLENAGEM'};
+const codesList=()=>D.codigos.filter(c=>c[pf()==='SANEAMENTO'?'SANEAMENTO':'TERRAPLENAGEM']!=='NAO').map(c=>[c['CÓDIGO DESVIO'],c['CÓDIGO DESVIO']+' – '+c['DESCRIÇÃO']]);
+const tiposList=()=>D.tipos.filter(t=>String(t.perfil).toUpperCase().indexOf(pf())>=0).map(t=>[t.cod,t.cod+' – '+t.desc]);
+const eqList=()=>S.eq.map((e,i)=>[i,((e['PLACA / ID']||'')+' '+(e['EQUIPAMENTO (CADASTRO OU DIGITADO)']||'')).trim()]).filter(x=>x[1]);
+
+function rEf(){$('ef').innerHTML=S.ef.map((r,i)=>`<div class="item"><div class="g">${F('ef',i,'FUNÇÃO','Função','',D.listas.funcoes)}${F('ef',i,'QUANTIDADE','Quantidade','number')}</div>${DEL('ef',i)}</div>`).join('')}
+function rEq(){$('eq').innerHTML=S.eq.map((r,i)=>{const L=r['ORIGEM (PRÓPRIO/LOCADO)']==='LOCADO';
+  return `<div class="item"><div class="g">${F('eq',i,'ORIGEM (PRÓPRIO/LOCADO)','Origem','',['PRÓPRIO','LOCADO'])}`+
+  (L?F('eq',i,'EQUIPAMENTO (CADASTRO OU DIGITADO)','Equipamento locado (nome)')+F('eq',i,'LOCADORA','Locadora'):
+  F('eq',i,'PLACA / ID','Equipamento','',D.equipamentos.map(e=>[e.Placa,e.Placa+' – '+e['Veículo / Equipamento']])))+
+  `${F('eq',i,'LEITURA INICIAL','Horímetro/Km inicial','number')}${F('eq',i,'LEITURA FINAL','Horímetro/Km final','number')}${F('eq',i,'COMBUSTÍVEL (L)','Combustível (L)','number')}</div>${DEL('eq',i)}</div>`}).join('')}
+function rAp(){$('ap').innerHTML=S.ap.map((a,i)=>{const c=a.COD||'',isT=/^T/.test(c),t=a['TIPO SERVIÇO'];let x='';
+  if(isT){x+=F('ap',i,'TIPO SERVIÇO','Tipo de serviço','',tiposList())+F('ap',i,'NÚMERO OS','OS / Frente')+F('ap',i,'Trecho','Trecho / Local');
+    if(c!=='T3'){x+=F('ap',i,'QUANTIDADE','Quantidade','number')+F('ap',i,'UNIDADE','Unidade','',D.listas.unidades);
+      if(t==='ESC'||t==='ATE')x+=F('ap',i,'ESTACA INICIAL','Estaca inicial')+F('ap',i,'ESTACA FINAL','Estaca final')+F('ap',i,'MATERIAL (CATEGORIA)','Material','',['1ª CATEGORIA','2ª CATEGORIA','3ª CATEGORIA']);
+      if(t==='TRP')x+=F('ap',i,'ORIGEM DO MATERIAL','Origem')+F('ap',i,'DESTINO','Destino')+F('ap',i,'Nº VIAGENS','Nº de viagens','number')+F('ap',i,'CAPACIDADE (m³)','Capacidade (m³)','number')+F('ap',i,'DMT (m)','DMT (m)','number');
+      if(t==='CMP')x+=F('ap',i,'CAMADA','Camada','number')+F('ap',i,'ESPESSURA (cm)','Espessura (cm)','number')+F('ap',i,'Nº ENSAIO','Nº do ensaio')}}
+  return `<div class="item"><b>#${i+1}</b><div class="g">${F('ap',i,'EQUIPE','Equipe','',D.listas.equipes)}${F('ap',i,'_eq','Equipamento','',eqList())}${F('ap',i,'HR INICIAL','Início','time')}${F('ap',i,'HR FINAL','Fim','time')}${F('ap',i,'COD','Código','',codesList())}${F('ap',i,'DESCRIÇÃO DA OPERAÇÃO','Operação')}${x}${F('ap',i,'OBS','Observação')}</div>${DEL('ap',i)}</div>`}).join('')}
+function rFo(){$('ph').innerHTML=S.fo.map((p,i)=>`<div class="ph"><img src="${p.b64}"><input data-l="fo" data-i="${i}" data-f="leg" placeholder="Legenda" value="${esc(p.leg)}"><label><input type="checkbox" data-l="fo" data-i="${i}" data-f="extra"${p.extra?' checked':''}> Extra</label>${DEL('fo',i)}</div>`).join('')}
+const rAll=()=>{rEf();rEq();rAp();rFo()};
+
+document.addEventListener('change',e=>{const el=e.target,l=el.dataset.l;if(!l)return;const i=+el.dataset.i,f=el.dataset.f,r=S[l][i];
+  r[f]=el.type==='number'?(el.value===''?'':+el.value):el.type==='checkbox'?el.checked:el.value;
+  if(l==='eq'){
+    if(f==='PLACA / ID'){const q=D.equipamentos.find(q=>q.Placa===r[f])||{};r['EQUIPAMENTO (CADASTRO OU DIGITADO)']=q['Veículo / Equipamento']||'';r.CATEGORIA=q.Categoria||'';r.MEDIDOR=q.MEDIDOR||''}
+    if(f.indexOf('ORIGEM')===0){r['PLACA / ID']='';r['EQUIPAMENTO (CADASTRO OU DIGITADO)']='';r.CATEGORIA='';r.MEDIDOR=''}
+    if(f.indexOf('ORIGEM')===0||f==='PLACA / ID'||f==='EQUIPAMENTO (CADASTRO OU DIGITADO)'){rEq();rAp()}}
+  if(l==='ap'){
+    if(f==='_eq'){const q=D.equipamentos.find(q=>S.eq[r._eq]&&q.Placa===S.eq[r._eq]['PLACA / ID']);if(q&&q['CAPACIDADE CAÇAMBA (m³)']&&!r['CAPACIDADE (m³)'])r['CAPACIDADE (m³)']=q['CAPACIDADE CAÇAMBA (m³)']}
+    if((f==='Nº VIAGENS'||f==='CAPACIDADE (m³)'||f==='_eq')&&r['Nº VIAGENS']&&r['CAPACIDADE (m³)'])r.QUANTIDADE=r['Nº VIAGENS']*r['CAPACIDADE (m³)'];
+    if(['COD','TIPO SERVIÇO','_eq','Nº VIAGENS','CAPACIDADE (m³)'].indexOf(f)>=0)rAp()}});
+document.addEventListener('click',e=>{
+  const d=e.target.closest('[data-del]');if(d){S[d.dataset.del].splice(+d.dataset.i,1);rAll();if(d.dataset.del==='eq')rAp();return}
+  const a=e.target.closest('[data-add]');if(!a)return;const k=a.dataset.add;
+  if(k==='ef')S.ef.push({'FUNÇÃO':'','QUANTIDADE':'','VÍNCULO (PRÓPRIO/TERCEIRO)':'PRÓPRIO'});
+  if(k==='eq')S.eq.push({'ORIGEM (PRÓPRIO/LOCADO)':'PRÓPRIO'});
+  if(k==='ap'){const L=S.ap[S.ap.length-1]||{};S.ap.push({EQUIPE:L.EQUIPE||D.listas.equipes[0]||'',_eq:L._eq==null?'':L._eq,'DESCRIÇÃO DA OPERAÇÃO':L['DESCRIÇÃO DA OPERAÇÃO']||'','HR INICIAL':L['HR FINAL']||'',COD:''})}
+  rAll()});
+$('obra').onchange=rAp;
+
+const comp=f=>new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement('canvas');
+  c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.72))};im.onerror=no;im.src=URL.createObjectURL(f)});
+$('bf').onclick=()=>$('fi').click();
+$('fi').onchange=async e=>{for(const f of e.target.files){if(S.fo.length>=10){say('Máximo de 10 fotos',false);break}S.fo.push({b64:await comp(f),leg:'',extra:false})}e.target.value='';rFo()};
+
+async function start(){D=await call('bootstrap');$('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent=D.user.nome||D.user.usuario;
+  $('obra').innerHTML=O(D.obras.map(o=>o.OBRA),D.obras.length===1?D.obras[0].OBRA:'');
+  $('dt').value=new Date().toLocaleDateString('en-CA');
+  ['cm','ct','cn'].forEach(k=>$(k).innerHTML=O(D.listas.clima));$('tr').innerHTML=O(D.listas.terreno);rAll()}
+$('bl').onclick=async()=>{try{T='';const j=await call('login',{usuario:$('lu').value,senha:$('lp').value});T=j.token;try{sessionStorage.setItem('t',T)}catch(e){}await start()}catch(e){say(e.message,false)}};
+$('out').onclick=()=>{try{sessionStorage.removeItem('t')}catch(e){}location.reload()};
+
+$('env').onclick=async()=>{const b=$('env');try{
+  if(!$('obra').value||!$('dt').value)throw new Error('Informe a obra e a data');
+  b.disabled=true;say('Enviando RDO...',true);
+  const aps=S.ap.map(a=>{const o=Object.assign({},a),q=S.eq[a._eq];delete o._eq;
+    if(q){o['ORIGEM EQUIP.']=q['ORIGEM (PRÓPRIO/LOCADO)'];if(q['ORIGEM (PRÓPRIO/LOCADO)']==='LOCADO')o['EQUIPAMENTO LOCADO (DESCRIÇÃO)']=q['EQUIPAMENTO (CADASTRO OU DIGITADO)'];else o['EQUIPAMENTO (PLACA/ID)']=q['PLACA / ID']}
+    return o});
+  const rdo={obra:$('obra').value,data:$('dt').value,climaManha:$('cm').value,climaTarde:$('ct').value,climaNoite:$('cn').value,terreno:$('tr').value,
+    descricao:$('ds').value,notas:$('nt').value,obsEmpresa:$('oe').value,obsContratante:$('oc').value,fiscal:$('fs').value,
+    apontamentos:aps,efetivo:S.ef.filter(r=>r['FUNÇÃO']&&r.QUANTIDADE),equipamentos:S.eq.filter(r=>r['PLACA / ID']||r['EQUIPAMENTO (CADASTRO OU DIGITADO)'])};
+  const j=await call('saveRdo',{rdo});
+  for(let i=0;i<S.fo.length;i++){say(`Enviando foto ${i+1} de ${S.fo.length}...`,true);const p=S.fo[i];
+    await call('uploadFoto',{foto:{idRdo:j.idRdo,numero:j.numero,obra:rdo.obra,data:rdo.data,n:i+1,legenda:p.leg,extra:p.extra,mime:'image/jpeg',b64:p.b64.split(',')[1]}})}
+  say(`RDO nº ${j.numero} enviado com sucesso`,true)}catch(e){say(e.message,false)}b.disabled=false};
+
+if(T)start().catch(()=>{T=''});
+</script></body></html>
