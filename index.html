@@ -66,13 +66,18 @@ function rEq(){$('eq').innerHTML=S.eq.map((r,i)=>{const L=r['ORIGEM (PRÓPRIO/LO
   (L?F('eq',i,'EQUIPAMENTO (CADASTRO OU DIGITADO)','Equipamento locado (nome)')+F('eq',i,'LOCADORA','Locadora'):
   F('eq',i,'PLACA / ID','Equipamento','',D.equipamentos.map(e=>[e.Placa,e.Placa+' – '+e['Veículo / Equipamento']])))+
   `${F('eq',i,'LEITURA INICIAL','Horímetro/Km inicial','number')}${F('eq',i,'LEITURA FINAL','Horímetro/Km final','number')}${F('eq',i,'COMBUSTÍVEL (L)','Combustível (L)','number')}</div>${DEL('eq',i)}</div>`}).join('')}
+const opsList=()=>D.operacoes.filter(o=>{const p=String(o.PERFIL||'').toUpperCase();return !p||p==='TODOS'||p.indexOf(pf())>=0}).map(o=>o['OPERAÇÃO']);
+function opF(a,i){const l=opsList(),cur=a['DESCRIÇÃO DA OPERAÇÃO']||'';if(!l.length)return F('ap',i,'DESCRIÇÃO DA OPERAÇÃO','Operação');
+  const sel=a._op||(cur&&l.indexOf(cur)<0?'__outra':cur);
+  return `<div><label>Operação</label><select data-l="ap" data-i="${i}" data-f="_op">${O(l.concat([['__outra','Outra (digitar)']]),sel)}</select></div>`+(sel==='__outra'?F('ap',i,'DESCRIÇÃO DA OPERAÇÃO','Descreva a operação'):'')}
+function opDef(r){const o=D.operacoes.find(x=>x['OPERAÇÃO']===r['DESCRIÇÃO DA OPERAÇÃO']);if(o&&/^T/.test(r.COD||'')){if(!r['TIPO SERVIÇO']&&o['TIPO SERVIÇO'])r['TIPO SERVIÇO']=o['TIPO SERVIÇO'];if(!r.UNIDADE&&o['UNIDADE'])r.UNIDADE=o['UNIDADE']}}
 function rAp(){$('ap').innerHTML=S.ap.map((a,i)=>{const c=a.COD||'',isT=/^T/.test(c),t=a['TIPO SERVIÇO'];let x='';
   if(isT){x+=F('ap',i,'TIPO SERVIÇO','Tipo de serviço','',tiposList())+F('ap',i,'NÚMERO OS','OS / Frente')+F('ap',i,'Trecho','Trecho / Local');
     if(c!=='T3'){x+=F('ap',i,'QUANTIDADE','Quantidade','number')+F('ap',i,'UNIDADE','Unidade','',D.listas.unidades);
       if(t==='ESC'||t==='ATE')x+=F('ap',i,'ESTACA INICIAL','Estaca inicial')+F('ap',i,'ESTACA FINAL','Estaca final')+F('ap',i,'MATERIAL (CATEGORIA)','Material','',['1ª CATEGORIA','2ª CATEGORIA','3ª CATEGORIA']);
       if(t==='TRP')x+=F('ap',i,'ORIGEM DO MATERIAL','Origem')+F('ap',i,'DESTINO','Destino')+F('ap',i,'Nº VIAGENS','Nº de viagens','number')+F('ap',i,'CAPACIDADE (m³)','Capacidade (m³)','number')+F('ap',i,'DMT (m)','DMT (m)','number');
       if(t==='CMP')x+=F('ap',i,'CAMADA','Camada','number')+F('ap',i,'ESPESSURA (cm)','Espessura (cm)','number')+F('ap',i,'Nº ENSAIO','Nº do ensaio')}}
-  return `<div class="item"><b>#${i+1}</b><div class="g">${F('ap',i,'EQUIPE','Equipe','',D.listas.equipes)}${F('ap',i,'_eq','Equipamento','',eqList())}${F('ap',i,'HR INICIAL','Início','time')}${F('ap',i,'HR FINAL','Fim','time')}${F('ap',i,'COD','Código','',codesList())}${F('ap',i,'DESCRIÇÃO DA OPERAÇÃO','Operação')}${x}${F('ap',i,'OBS','Observação')}</div>${DEL('ap',i)}</div>`}).join('')}
+  return `<div class="item"><b>#${i+1}</b><div class="g">${F('ap',i,'EQUIPE','Equipe','',D.listas.equipes)}${F('ap',i,'_eq','Equipamento','',eqList())}${F('ap',i,'HR INICIAL','Início','time')}${F('ap',i,'HR FINAL','Fim','time')}${F('ap',i,'COD','Código','',codesList())}${opF(a,i)}${x}${F('ap',i,'OBS','Observação')}</div>${DEL('ap',i)}</div>`}).join('')}
 function rFo(){$('ph').innerHTML=S.fo.map((p,i)=>`<div class="ph"><img src="${p.b64}"><input data-l="fo" data-i="${i}" data-f="leg" placeholder="Legenda" value="${esc(p.leg)}"><label><input type="checkbox" data-l="fo" data-i="${i}" data-f="extra"${p.extra?' checked':''}> Extra</label>${DEL('fo',i)}</div>`).join('')}
 const rAll=()=>{rEf();rEq();rAp();rFo()};
 
@@ -83,9 +88,11 @@ document.addEventListener('change',e=>{const el=e.target,l=el.dataset.l;if(!l)re
     if(f.indexOf('ORIGEM')===0){r['PLACA / ID']='';r['EQUIPAMENTO (CADASTRO OU DIGITADO)']='';r.CATEGORIA='';r.MEDIDOR=''}
     if(f.indexOf('ORIGEM')===0||f==='PLACA / ID'||f==='EQUIPAMENTO (CADASTRO OU DIGITADO)'){rEq();rAp()}}
   if(l==='ap'){
+    if(f==='_op'){r['DESCRIÇÃO DA OPERAÇÃO']=r._op==='__outra'?'':r._op;opDef(r)}
+    if(f==='COD')opDef(r);
     if(f==='_eq'){const q=D.equipamentos.find(q=>S.eq[r._eq]&&q.Placa===S.eq[r._eq]['PLACA / ID']);if(q&&q['CAPACIDADE CAÇAMBA (m³)']&&!r['CAPACIDADE (m³)'])r['CAPACIDADE (m³)']=q['CAPACIDADE CAÇAMBA (m³)']}
     if((f==='Nº VIAGENS'||f==='CAPACIDADE (m³)'||f==='_eq')&&r['Nº VIAGENS']&&r['CAPACIDADE (m³)'])r.QUANTIDADE=r['Nº VIAGENS']*r['CAPACIDADE (m³)'];
-    if(['COD','TIPO SERVIÇO','_eq','Nº VIAGENS','CAPACIDADE (m³)'].indexOf(f)>=0)rAp()}});
+    if(['COD','TIPO SERVIÇO','_eq','_op','Nº VIAGENS','CAPACIDADE (m³)'].indexOf(f)>=0)rAp()}});
 document.addEventListener('click',e=>{
   const d=e.target.closest('[data-del]');if(d){S[d.dataset.del].splice(+d.dataset.i,1);rAll();if(d.dataset.del==='eq')rAp();return}
   const a=e.target.closest('[data-add]');if(!a)return;const k=a.dataset.add;
@@ -114,7 +121,7 @@ $('env').onclick=async()=>{const b=$('env');try{
   const bad=S.ap.findIndex(a=>!a.COD||!a['HR INICIAL']||!a['HR FINAL']);if(bad>=0)throw new Error(`Apontamento #${bad+1}: informe código, início e fim`);
   if(!confirm(`Enviar o RDO de ${$('obra').value} do dia ${$('dt').value.split('-').reverse().join('/')} com ${S.ap.length} apontamentos e ${S.fo.length} fotos?`))return;
   b.disabled=true;say('Enviando RDO...',true);
-  const aps=S.ap.map(a=>{const o=Object.assign({},a),q=S.eq[a._eq];delete o._eq;
+  const aps=S.ap.map(a=>{const o=Object.assign({},a),q=S.eq[a._eq];delete o._eq;delete o._op;
     if(q){o['ORIGEM EQUIP.']=q['ORIGEM (PRÓPRIO/LOCADO)'];if(q['ORIGEM (PRÓPRIO/LOCADO)']==='LOCADO')o['EQUIPAMENTO LOCADO (DESCRIÇÃO)']=q['EQUIPAMENTO (CADASTRO OU DIGITADO)'];else o['EQUIPAMENTO (PLACA/ID)']=q['PLACA / ID']}
     return o});
   const rdo={obra:$('obra').value,data:$('dt').value,climaManha:$('cm').value,climaTarde:$('ct').value,climaNoite:$('cn').value,terreno:$('tr').value,
