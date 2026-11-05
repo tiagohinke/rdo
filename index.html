@@ -32,6 +32,7 @@ button:disabled{opacity:.5}.item{border:1px solid #dde;border-radius:8px;padding
 <div class="card"><h2>Efetivo</h2><div id="ef"></div><button class="s" data-add="ef">+ Função</button></div>
 <div class="card"><h2>Equipamentos do dia</h2><div id="eq"></div><button class="s" data-add="eq">+ Equipamento</button></div>
 <div class="card"><h2>Apontamentos</h2><div id="ap"></div><button class="s" data-add="ap">+ Apontamento</button></div>
+<div class="card"><h2>Materiais utilizados</h2><div id="mt"></div><button class="s" data-add="mt">+ Material</button></div>
 <div class="card"><h2>Descrição e observações</h2>
 <label>Descrição do que foi feito</label><textarea id="ds" rows="4"></textarea>
 <label>Notas / sugestões</label><textarea id="nt" rows="2"></textarea>
@@ -46,7 +47,7 @@ button:disabled{opacity:.5}.item{border:1px solid #dde;border-radius:8px;padding
 const API='https://script.google.com/macros/s/AKfycbyH86_b7Wo8O6ivImyNkrHleQcevH7dXWQquXULnluhMg0vU5PEOM9uOECX6qIQv_6o/exec';
 const $=i=>document.getElementById(i);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let T='',D=null;const S={ap:[],ef:[],eq:[],fo:[]};
+let T='',D=null;const S={ap:[],ef:[],eq:[],mt:[],fo:[]};
 try{T=sessionStorage.getItem('t')||''}catch(e){}
 function say(t,ok,ms){const m=$('msg');m.textContent=t;m.style.background=ok?'#2e7d32':'#c62828';m.style.display='block';clearTimeout(say.t);say.t=setTimeout(()=>m.style.display='none',ms||6000)}
 async function call(a,b){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action:a,token:T},b||{}))});
@@ -82,7 +83,12 @@ function rAp(){$('ap').innerHTML=S.ap.map((a,i)=>{const c=a.COD||'',isT=/^T/.tes
       if(t==='CMP')x+=F('ap',i,'CAMADA','Camada','number')+F('ap',i,'ESPESSURA (cm)','Espessura (cm)','number')+F('ap',i,'Nº ENSAIO','Nº do ensaio')}}
   return `<div class="item"><b>#${i+1}</b><div class="g">${F('ap',i,'EQUIPE','Equipe','',D.listas.equipes)}${F('ap',i,'_eq','Equipamento','',eqList())}${F('ap',i,'HR INICIAL','Início','time')}${F('ap',i,'HR FINAL','Fim','time')}${F('ap',i,'COD','Código','',codesList())}${opF(a,i)}${x}${F('ap',i,'OBS','Observação')}</div>${DEL('ap',i)}</div>`}).join('')}
 function rFo(){$('ph').innerHTML=S.fo.map((p,i)=>`<div class="ph"><img src="${p.b64}"><input data-l="fo" data-i="${i}" data-f="leg" placeholder="Legenda" value="${esc(p.leg)}"><label><input type="checkbox" data-l="fo" data-i="${i}" data-f="extra"${p.extra?' checked':''}> Extra</label>${DEL('fo',i)}</div>`).join('')}
-const rAll=()=>{rEf();rEq();rAp();rFo()};
+function matOpts(sel){const g={};D.materiais.forEach(m=>{const k=String(m.GRUPO||'MATERIAIS').toUpperCase();(g[k]=g[k]||[]).push(m.MATERIAL)});
+  return '<option value=""></option>'+Object.keys(g).sort().map(k=>`<optgroup label="${esc(k)}">${g[k].map(n=>`<option value="${esc(n)}"${n===sel?' selected':''}>${esc(n)}</option>`).join('')}</optgroup>`).join('')+`<option value="__outro"${sel==='__outro'?' selected':''}>Outro (digitar)</option>`}
+function rMt(){$('mt').innerHTML=S.mt.map((r,i)=>{const sel=D.materiais.length?(r._m||(r.MATERIAL&&!D.materiais.some(m=>m.MATERIAL===r.MATERIAL)?'__outro':r.MATERIAL||'')):'__outro';
+  const un=r.UNIDADE&&D.listas.unidades.indexOf(r.UNIDADE)<0?D.listas.unidades.concat([r.UNIDADE]):D.listas.unidades;
+  return `<div class="item"><div class="g"><div><label>Material</label><select data-l="mt" data-i="${i}" data-f="_m">${matOpts(sel)}</select></div>${sel==='__outro'?F('mt',i,'MATERIAL','Nome do material'):''}${F('mt',i,'QUANTIDADE','Quantidade','number')}${F('mt',i,'UNIDADE','Unidade','',un)}${F('mt',i,'FORNECEDOR / ORIGEM','Origem / fornecedor')}</div>${DEL('mt',i)}</div>`}).join('')}
+const rAll=()=>{rEf();rEq();rAp();rMt();rFo()};
 
 document.addEventListener('change',e=>{const el=e.target,l=el.dataset.l;if(!l)return;const i=+el.dataset.i,f=el.dataset.f,r=S[l][i];
   r[f]=el.type==='number'?(el.value===''?'':+el.value):el.type==='checkbox'?el.checked:el.value;
@@ -90,6 +96,7 @@ document.addEventListener('change',e=>{const el=e.target,l=el.dataset.l;if(!l)re
     if(f==='PLACA / ID'){const q=D.equipamentos.find(q=>q.Placa===r[f])||{};r['EQUIPAMENTO (CADASTRO OU DIGITADO)']=q['Veículo / Equipamento']||'';r.CATEGORIA=q.Categoria||'';r.MEDIDOR=q.MEDIDOR||''}
     if(f.indexOf('ORIGEM')===0){r['PLACA / ID']='';r['EQUIPAMENTO (CADASTRO OU DIGITADO)']='';r.CATEGORIA='';r.MEDIDOR=''}
     if(f.indexOf('ORIGEM')===0||f==='PLACA / ID'||f==='EQUIPAMENTO (CADASTRO OU DIGITADO)'){rEq();rAp()}}
+  if(l==='mt'&&f==='_m'){if(r._m==='__outro'){r.MATERIAL='';r.UNIDADE=''}else{const m=D.materiais.find(x=>x.MATERIAL===r._m);r.MATERIAL=r._m;r.UNIDADE=m?m.UNIDADE:''}rMt()}
   if(l==='ap'){
     if(f==='_op'){r['DESCRIÇÃO DA OPERAÇÃO']=r._op==='__outra'?'':r._op;opDef(r)}
     if(f==='COD')opDef(r);
@@ -101,6 +108,7 @@ document.addEventListener('click',e=>{
   const a=e.target.closest('[data-add]');if(!a)return;const k=a.dataset.add;
   if(k==='ef')S.ef.push({'FUNÇÃO':'','QUANTIDADE':'','VÍNCULO (PRÓPRIO/TERCEIRO)':'PRÓPRIO'});
   if(k==='eq')S.eq.push({'ORIGEM (PRÓPRIO/LOCADO)':'PRÓPRIO'});
+  if(k==='mt')S.mt.push({_m:'',MATERIAL:'',QUANTIDADE:'',UNIDADE:'','FORNECEDOR / ORIGEM':''});
   if(k==='ap'){const L=S.ap[S.ap.length-1]||{};S.ap.push({EQUIPE:L.EQUIPE||D.listas.equipes[0]||'',_eq:L._eq==null?'':L._eq,'DESCRIÇÃO DA OPERAÇÃO':L['DESCRIÇÃO DA OPERAÇÃO']||'','HR INICIAL':L['HR FINAL']||'',COD:''})}
   rAll()});
 $('obra').onchange=rAp;
@@ -129,7 +137,8 @@ $('env').onclick=async()=>{const b=$('env');try{
     return o});
   const rdo={obra:$('obra').value,data:$('dt').value,climaManha:$('cm').value,climaTarde:$('ct').value,climaNoite:$('cn').value,terreno:$('tr').value,
     descricao:$('ds').value,notas:$('nt').value,obsEmpresa:$('oe').value,obsContratante:$('oc').value,fiscal:$('fs').value,
-    apontamentos:aps,efetivo:S.ef.filter(r=>r['FUNÇÃO']&&r.QUANTIDADE),equipamentos:S.eq.filter(r=>r['PLACA / ID']||r['EQUIPAMENTO (CADASTRO OU DIGITADO)'])};
+    apontamentos:aps,efetivo:S.ef.filter(r=>r['FUNÇÃO']&&r.QUANTIDADE),equipamentos:S.eq.filter(r=>r['PLACA / ID']||r['EQUIPAMENTO (CADASTRO OU DIGITADO)']),
+    materiais:S.mt.filter(r=>r.MATERIAL&&r.QUANTIDADE).map(r=>{const o=Object.assign({},r);delete o._m;return o})};
   const j=await call('saveRdo',{rdo});
   const fail=[];let err='';
   for(let i=0;i<S.fo.length;i++){say(`Enviando foto ${i+1} de ${S.fo.length}...`,true);const p=S.fo[i];let ok=false;
