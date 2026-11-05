@@ -57,7 +57,7 @@ const F=(l,i,f,lab,type,list)=>`<div><label>${lab}</label>`+(list?`<select data-
 const DEL=(l,i)=>`<button class="x" data-del="${l}" data-i="${i}">Remover</button>`;
 const pf=()=>{const o=D.obras.find(o=>o.OBRA===$('obra').value);return o?String(o.PERFIL).toUpperCase():'TERRAPLENAGEM'};
 const codesList=()=>D.codigos.filter(c=>c[pf()==='SANEAMENTO'?'SANEAMENTO':'TERRAPLENAGEM']!=='NAO').map(c=>[c['CÓDIGO DESVIO'],c['CÓDIGO DESVIO']+' – '+c['DESCRIÇÃO']]);
-const tiposList=()=>D.tipos.filter(t=>String(t.perfil).toUpperCase().indexOf(pf())>=0).map(t=>[t.cod,t.cod+' – '+t.desc]);
+const tiposList=()=>{const m=t=>String(t.perfil).toUpperCase().indexOf(pf())>=0;return D.tipos.slice().sort((a,b)=>m(b)-m(a)).map(t=>[t.cod,t.cod+' – '+t.desc])};
 const eqList=()=>S.eq.map((e,i)=>[i,((e['PLACA / ID']||'')+' '+(e['EQUIPAMENTO (CADASTRO OU DIGITADO)']||'')).trim()]).filter(x=>x[1]);
 
 function rEf(){$('ef').innerHTML=S.ef.map((r,i)=>`<div class="item"><div class="g">${F('ef',i,'FUNÇÃO','Função','',D.listas.funcoes)}${F('ef',i,'QUANTIDADE','Quantidade','number')}</div>${DEL('ef',i)}</div>`).join('')}
@@ -66,10 +66,13 @@ function rEq(){$('eq').innerHTML=S.eq.map((r,i)=>{const L=r['ORIGEM (PRÓPRIO/LO
   (L?F('eq',i,'EQUIPAMENTO (CADASTRO OU DIGITADO)','Equipamento locado (nome)')+F('eq',i,'LOCADORA','Locadora'):
   F('eq',i,'PLACA / ID','Equipamento','',D.equipamentos.map(e=>[e.Placa,e.Placa+' – '+e['Veículo / Equipamento']])))+
   `${F('eq',i,'LEITURA INICIAL','Horímetro/Km inicial','number')}${F('eq',i,'LEITURA FINAL','Horímetro/Km final','number')}${F('eq',i,'COMBUSTÍVEL (L)','Combustível (L)','number')}</div>${DEL('eq',i)}</div>`}).join('')}
-const opsList=()=>D.operacoes.filter(o=>{const p=String(o.PERFIL||'').toUpperCase();return !p||p==='TODOS'||p.indexOf(pf())>=0}).map(o=>o['OPERAÇÃO']);
+const opsList=()=>D.operacoes.map(o=>o['OPERAÇÃO']);
+function opOpts(sel){const g={};D.operacoes.forEach(o=>{const p=String(o.PERFIL||'OUTRAS').toUpperCase();(g[p]=g[p]||[]).push(o['OPERAÇÃO'])});
+  const ks=Object.keys(g).sort((a,b)=>(b===pf())-(a===pf())||a.localeCompare(b));
+  return '<option value=""></option>'+ks.map(k=>`<optgroup label="${esc(k)}">${g[k].map(n=>`<option value="${esc(n)}"${n===sel?' selected':''}>${esc(n)}</option>`).join('')}</optgroup>`).join('')+`<option value="__outra"${sel==='__outra'?' selected':''}>Outra (digitar)</option>`}
 function opF(a,i){const l=opsList(),cur=a['DESCRIÇÃO DA OPERAÇÃO']||'';if(!l.length)return F('ap',i,'DESCRIÇÃO DA OPERAÇÃO','Operação');
   const sel=a._op||(cur&&l.indexOf(cur)<0?'__outra':cur);
-  return `<div><label>Operação</label><select data-l="ap" data-i="${i}" data-f="_op">${O(l.concat([['__outra','Outra (digitar)']]),sel)}</select></div>`+(sel==='__outra'?F('ap',i,'DESCRIÇÃO DA OPERAÇÃO','Descreva a operação'):'')}
+  return `<div><label>Operação</label><select data-l="ap" data-i="${i}" data-f="_op">${opOpts(sel)}</select></div>`+(sel==='__outra'?F('ap',i,'DESCRIÇÃO DA OPERAÇÃO','Descreva a operação'):'')}
 function opDef(r){const o=D.operacoes.find(x=>x['OPERAÇÃO']===r['DESCRIÇÃO DA OPERAÇÃO']);if(o&&/^T/.test(r.COD||'')){if(!r['TIPO SERVIÇO']&&o['TIPO SERVIÇO'])r['TIPO SERVIÇO']=o['TIPO SERVIÇO'];if(!r.UNIDADE&&o['UNIDADE'])r.UNIDADE=o['UNIDADE']}}
 function rAp(){$('ap').innerHTML=S.ap.map((a,i)=>{const c=a.COD||'',isT=/^T/.test(c),t=a['TIPO SERVIÇO'];let x='';
   if(isT){x+=F('ap',i,'TIPO SERVIÇO','Tipo de serviço','',tiposList())+F('ap',i,'NÚMERO OS','OS / Frente')+F('ap',i,'Trecho','Trecho / Local');
