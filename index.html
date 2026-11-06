@@ -31,6 +31,7 @@ button:disabled{opacity:.5}.item{border:1px solid #dde;border-radius:8px;padding
 <div><label>Clima noite</label><select id="cn"></select></div><div><label>Condição do terreno</label><select id="tr"></select></div></div></div>
 <div class="card"><h2>Efetivo</h2><div id="ef"></div><button class="s" data-add="ef">+ Função</button></div>
 <div class="card"><h2>Equipamentos do dia</h2><div id="eq"></div><button class="s" data-add="eq">+ Equipamento</button></div>
+<div class="card"><h2>Equipamentos de pequeno porte</h2><div id="pq"></div><button class="s" data-add="pq">+ Equipamento de pequeno porte</button></div>
 <div class="card"><h2>Apontamentos</h2><div id="ap"></div><button class="s" data-add="ap">+ Apontamento</button></div>
 <div class="card"><h2>Materiais utilizados</h2><div id="mt"></div><button class="s" data-add="mt">+ Material</button></div>
 <div class="card"><h2>Descrição e observações</h2>
@@ -42,19 +43,19 @@ button:disabled{opacity:.5}.item{border:1px solid #dde;border-radius:8px;padding
 <div class="card"><h2>Fotos (até 20)</h2><div id="ph"></div>
 <input id="fi" type="file" accept="image/*" multiple class="hide"><button class="s" id="bf">+ Adicionar fotos</button></div>
 <button id="env" style="width:100%;padding:14px">Enviar RDO</button>
-</div></main><div id="msg"></div>
+</div></main><datalist id="dl-loc"></datalist><div id="msg"></div>
 <script>
 const API='https://script.google.com/macros/s/AKfycbyH86_b7Wo8O6ivImyNkrHleQcevH7dXWQquXULnluhMg0vU5PEOM9uOECX6qIQv_6o/exec';
 const $=i=>document.getElementById(i);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let T='',D=null;const S={ap:[],ef:[],eq:[],mt:[],fo:[]};
+let T='',D=null;const S={ap:[],ef:[],eq:[],pq:[],mt:[],fo:[]};
 try{T=sessionStorage.getItem('t')||''}catch(e){}
 function say(t,ok,ms){const m=$('msg');m.textContent=t;m.style.background=ok?'#2e7d32':'#c62828';m.style.display='block';clearTimeout(say.t);say.t=setTimeout(()=>m.style.display='none',ms||6000)}
 async function call(a,b){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action:a,token:T},b||{}))});
   const j=await r.json();if(!j.ok)throw new Error(j.error||'Erro');return j}
 const O=(a,v)=>'<option value=""></option>'+a.map(x=>{const k=Array.isArray(x)?x[0]:x,l=Array.isArray(x)?x[1]:x;return `<option value="${esc(k)}"${String(k)===String(v)?' selected':''}>${esc(l)}</option>`}).join('');
 const F=(l,i,f,lab,type,list)=>`<div><label>${lab}</label>`+(list?`<select data-l="${l}" data-i="${i}" data-f="${esc(f)}">${O(list,S[l][i][f])}</select>`:
-  `<input type="${type||'text'}" data-l="${l}" data-i="${i}" data-f="${esc(f)}" value="${esc(S[l][i][f])}"${type==='number'?' inputmode="decimal" step="any"':''}>`)+'</div>';
+  `<input type="${type||'text'}" data-l="${l}" data-i="${i}" data-f="${esc(f)}"${f==='LOCADORA'?' list="dl-loc"':''} value="${esc(S[l][i][f])}"${type==='number'?' inputmode="decimal" step="any"':''}>`)+'</div>';
 const DEL=(l,i)=>`<button class="x" data-del="${l}" data-i="${i}">Remover</button>`;
 const pf=()=>{const o=D.obras.find(o=>o.OBRA===$('obra').value);return o?String(o.PERFIL).toUpperCase():'TERRAPLENAGEM'};
 const codesList=()=>D.codigos.filter(c=>c[pf()==='SANEAMENTO'?'SANEAMENTO':'TERRAPLENAGEM']!=='NAO').map(c=>[c['CÓDIGO DESVIO'],c['CÓDIGO DESVIO']+' – '+c['DESCRIÇÃO']]);
@@ -88,7 +89,9 @@ function matOpts(sel){const g={};D.materiais.forEach(m=>{const k=String(m.GRUPO|
 function rMt(){$('mt').innerHTML=S.mt.map((r,i)=>{const sel=D.materiais.length?(r._m||(r.MATERIAL&&!D.materiais.some(m=>m.MATERIAL===r.MATERIAL)?'__outro':r.MATERIAL||'')):'__outro';
   const un=r.UNIDADE&&D.listas.unidades.indexOf(r.UNIDADE)<0?D.listas.unidades.concat([r.UNIDADE]):D.listas.unidades;
   return `<div class="item"><div class="g"><div><label>Material</label><select data-l="mt" data-i="${i}" data-f="_m">${matOpts(sel)}</select></div>${sel==='__outro'?F('mt',i,'MATERIAL','Nome do material'):''}${F('mt',i,'QUANTIDADE','Quantidade','number')}${F('mt',i,'UNIDADE','Unidade','',un)}${F('mt',i,'FORNECEDOR / ORIGEM','Origem / fornecedor')}</div>${DEL('mt',i)}</div>`}).join('')}
-const rAll=()=>{rEf();rEq();rAp();rMt();rFo()};
+function rPq(){$('pq').innerHTML=S.pq.map((r,i)=>{const L=D.tiposPq,sel=L.length?(r._t||(r.EQUIPAMENTO&&L.indexOf(r.EQUIPAMENTO)<0?'__outro':r.EQUIPAMENTO||'')):'__outro',loc=r['ORIGEM (PRÓPRIO/LOCADO)']==='LOCADO';
+  return `<div class="item"><div class="g"><div><label>Equipamento</label><select data-l="pq" data-i="${i}" data-f="_t">${O(L.concat([['__outro','Outro (digitar)']]),sel)}</select></div>${sel==='__outro'?F('pq',i,'EQUIPAMENTO','Nome do equipamento'):''}${F('pq',i,'Nº IDENTIFICAÇÃO','Nº de identificação (patrimônio ou nº da locadora)')}${F('pq',i,'ORIGEM (PRÓPRIO/LOCADO)','Fornecedor','',['PRÓPRIO','LOCADO'])}${loc?F('pq',i,'LOCADORA','Locadora'):''}</div>${DEL('pq',i)}</div>`}).join('')}
+const rAll=()=>{rEf();rEq();rPq();rAp();rMt();rFo()};
 
 document.addEventListener('change',e=>{const el=e.target,l=el.dataset.l;if(!l)return;const i=+el.dataset.i,f=el.dataset.f,r=S[l][i];
   r[f]=el.type==='number'?(el.value===''?'':+el.value):el.type==='checkbox'?el.checked:el.value;
@@ -96,6 +99,7 @@ document.addEventListener('change',e=>{const el=e.target,l=el.dataset.l;if(!l)re
     if(f==='PLACA / ID'){const q=D.equipamentos.find(q=>q.Placa===r[f])||{};r['EQUIPAMENTO (CADASTRO OU DIGITADO)']=q['Veículo / Equipamento']||'';r.CATEGORIA=q.Categoria||'';r.MEDIDOR=q.MEDIDOR||''}
     if(f.indexOf('ORIGEM')===0){r['PLACA / ID']='';r['EQUIPAMENTO (CADASTRO OU DIGITADO)']='';r.CATEGORIA='';r.MEDIDOR=''}
     if(f.indexOf('ORIGEM')===0||f==='PLACA / ID'||f==='EQUIPAMENTO (CADASTRO OU DIGITADO)'){rEq();rAp()}}
+  if(l==='pq'){if(f==='_t'){r.EQUIPAMENTO=r._t==='__outro'?'':r._t;rPq()}if(f==='ORIGEM (PRÓPRIO/LOCADO)'){if(r[f]!=='LOCADO')r.LOCADORA='';rPq()}}
   if(l==='mt'&&f==='_m'){if(r._m==='__outro'){r.MATERIAL='';r.UNIDADE=''}else{const m=D.materiais.find(x=>x.MATERIAL===r._m);r.MATERIAL=r._m;r.UNIDADE=m?m.UNIDADE:''}rMt()}
   if(l==='ap'){
     if(f==='_op'){r['DESCRIÇÃO DA OPERAÇÃO']=r._op==='__outra'?'':r._op;opDef(r)}
@@ -108,6 +112,7 @@ document.addEventListener('click',e=>{
   const a=e.target.closest('[data-add]');if(!a)return;const k=a.dataset.add;
   if(k==='ef')S.ef.push({'FUNÇÃO':'','QUANTIDADE':'','VÍNCULO (PRÓPRIO/TERCEIRO)':'PRÓPRIO'});
   if(k==='eq')S.eq.push({'ORIGEM (PRÓPRIO/LOCADO)':'PRÓPRIO'});
+  if(k==='pq')S.pq.push({_t:'',EQUIPAMENTO:'','Nº IDENTIFICAÇÃO':'','ORIGEM (PRÓPRIO/LOCADO)':'PRÓPRIO',LOCADORA:''});
   if(k==='mt')S.mt.push({_m:'',MATERIAL:'',QUANTIDADE:'',UNIDADE:'','FORNECEDOR / ORIGEM':''});
   if(k==='ap'){const L=S.ap[S.ap.length-1]||{};S.ap.push({EQUIPE:L.EQUIPE||D.listas.equipes[0]||'',_eq:L._eq==null?'':L._eq,'DESCRIÇÃO DA OPERAÇÃO':L['DESCRIÇÃO DA OPERAÇÃO']||'','HR INICIAL':L['HR FINAL']||'',COD:''})}
   rAll()});
@@ -118,7 +123,9 @@ const comp=f=>new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=
 $('bf').onclick=()=>$('fi').click();
 $('fi').onchange=async e=>{const fs=[...e.target.files];let bad=0;for(const f of fs){if(S.fo.length>=20){say('Máximo de 20 fotos',false);break}try{S.fo.push({b64:await comp(f),leg:'',extra:false})}catch(x){bad++}}e.target.value='';rFo();if(bad)say(bad+' foto(s) não puderam ser lidas (formato não suportado). Tente outra ou tire pela câmera.',false,12000)};
 
-async function start(){D=await call('bootstrap');$('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent=D.user.nome||D.user.usuario;
+async function start(){D=await call('bootstrap');
+  D.tiposPq=[...new Set((D.pequeno||[]).map(x=>x.EQUIPAMENTO).filter(Boolean))];D.locadoras=[...new Set((D.pequeno||[]).map(x=>x.LOCADORA).filter(Boolean))];
+  $('dl-loc').innerHTML=D.locadoras.map(x=>`<option value="${esc(x)}">`).join('');$('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent=D.user.nome||D.user.usuario;
   $('obra').innerHTML=O(D.obras.map(o=>o.OBRA),D.obras.length===1?D.obras[0].OBRA:'');
   $('dt').value=new Date().toLocaleDateString('en-CA');
   ['cm','ct','cn'].forEach(k=>$(k).innerHTML=O(D.listas.clima));$('tr').innerHTML=O(D.listas.terreno);rAll()}
@@ -130,6 +137,8 @@ $('env').onclick=async()=>{const b=$('env');try{
   if(!$('obra').value||!$('dt').value)throw new Error('Informe a obra e a data');
   if(!S.ap.length)throw new Error('Inclua ao menos um apontamento');
   const bad=S.ap.findIndex(a=>!a.COD||!a['HR INICIAL']||!a['HR FINAL']);if(bad>=0)throw new Error(`Apontamento #${bad+1}: informe código, início e fim`);
+  const pb=S.pq.findIndex(q=>!q.EQUIPAMENTO||!q['Nº IDENTIFICAÇÃO']||(q['ORIGEM (PRÓPRIO/LOCADO)']==='LOCADO'&&!q.LOCADORA));
+  if(pb>=0)throw new Error(`Equipamento de pequeno porte #${pb+1}: informe o equipamento, o nº de identificação e, se for locado, a locadora`);
   if(!confirm(`Enviar o RDO de ${$('obra').value} do dia ${$('dt').value.split('-').reverse().join('/')} com ${S.ap.length} apontamentos e ${S.fo.length} fotos?`))return;
   b.disabled=true;say('Enviando RDO...',true);
   const aps=S.ap.map(a=>{const o=Object.assign({},a),q=S.eq[a._eq];delete o._eq;delete o._op;
@@ -138,6 +147,7 @@ $('env').onclick=async()=>{const b=$('env');try{
   const rdo={obra:$('obra').value,data:$('dt').value,climaManha:$('cm').value,climaTarde:$('ct').value,climaNoite:$('cn').value,terreno:$('tr').value,
     descricao:$('ds').value,notas:$('nt').value,obsEmpresa:$('oe').value,obsContratante:$('oc').value,fiscal:$('fs').value,
     apontamentos:aps,efetivo:S.ef.filter(r=>r['FUNÇÃO']&&r.QUANTIDADE),equipamentos:S.eq.filter(r=>r['PLACA / ID']||r['EQUIPAMENTO (CADASTRO OU DIGITADO)']),
+    pequenos:S.pq.map(r=>{const o=Object.assign({},r);delete o._t;return o}),
     materiais:S.mt.filter(r=>r.MATERIAL&&r.QUANTIDADE).map(r=>{const o=Object.assign({},r);delete o._m;return o})};
   const j=await call('saveRdo',{rdo});
   const fail=[];let err='';
