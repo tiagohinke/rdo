@@ -39,7 +39,7 @@ button:disabled{opacity:.5}.item{border:1px solid #dde;border-radius:8px;padding
 <label>Observações da empresa</label><textarea id="oe" rows="2"></textarea>
 <label>Observações do contratante</label><textarea id="oc" rows="2"></textarea>
 <label>Fiscal (nome)</label><input id="fs"></div>
-<div class="card"><h2>Fotos (até 10)</h2><div id="ph"></div>
+<div class="card"><h2>Fotos (até 20)</h2><div id="ph"></div>
 <input id="fi" type="file" accept="image/*" multiple class="hide"><button class="s" id="bf">+ Adicionar fotos</button></div>
 <button id="env" style="width:100%;padding:14px">Enviar RDO</button>
 </div></main><div id="msg"></div>
@@ -113,10 +113,10 @@ document.addEventListener('click',e=>{
   rAll()});
 $('obra').onchange=rAp;
 
-const comp=f=>new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement('canvas');
+const comp=f=>new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1024/Math.max(im.width,im.height)),c=document.createElement('canvas');
   c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.72))};im.onerror=no;im.src=URL.createObjectURL(f)});
 $('bf').onclick=()=>$('fi').click();
-$('fi').onchange=async e=>{const fs=[...e.target.files];let bad=0;for(const f of fs){if(S.fo.length>=10){say('Máximo de 10 fotos',false);break}try{S.fo.push({b64:await comp(f),leg:'',extra:false})}catch(x){bad++}}e.target.value='';rFo();if(bad)say(bad+' foto(s) não puderam ser lidas (formato não suportado). Tente outra ou tire pela câmera.',false,12000)};
+$('fi').onchange=async e=>{const fs=[...e.target.files];let bad=0;for(const f of fs){if(S.fo.length>=20){say('Máximo de 20 fotos',false);break}try{S.fo.push({b64:await comp(f),leg:'',extra:false})}catch(x){bad++}}e.target.value='';rFo();if(bad)say(bad+' foto(s) não puderam ser lidas (formato não suportado). Tente outra ou tire pela câmera.',false,12000)};
 
 async function start(){D=await call('bootstrap');$('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent=D.user.nome||D.user.usuario;
   $('obra').innerHTML=O(D.obras.map(o=>o.OBRA),D.obras.length===1?D.obras[0].OBRA:'');
